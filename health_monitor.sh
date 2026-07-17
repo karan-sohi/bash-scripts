@@ -1,39 +1,50 @@
 #!/bin/bash
 
+LOG_FILE="health_report.log"
+exec >> "$LOG_FILE" 2>&1
+
 echo "=========================="
 echo " Server Health Report"
 echo "=========================="
 
-echo "Hostname:"
-hostname
 
-echo ""
+HOSTNAME=${hostname}
+CURRENT_DATE=${date}
 
-echo "Date:"
-date
+echo "Hostname: $HOSTNAME"
+echo "Date: $CURRENT_DATE"
 
-echo ""
+
+check_threshold() {
+    local metric=$1
+    local value=$2
+    local threshold=$3
+
+    echo "$metric Usage: ${value}%"
+
+    if [ "$value" -gt "$threshold" ] 
+    then
+    echo "WARNING: $metric usage above ${threshold}%"
+    fi
+}
 
 CPU_IDLE=$(top -bn1 | grep "Cpu" | awk '{print $8}')
-CPU_USAGE=$(echo "100 - $CPU_IDLE" | bc)
+CPU_USAGE=$(echo "100 - $CPU_IDLE" | bc | awk '{printf "%.0f", %1'})
+CPU_THRESHOLD=80
 
-echo "CPU Usage: $CPU_USAGE%"
 
-
-MEMORY_USAGE=$(free | awk '/Mem/ {printf "%.2f", $3/$2 * 100}')
-
-echo "Memory Usage: $MEMORY_USAGE%"
-
+MEMORY_USAGE=$(free | awk '/Mem/ {printf "%.0f", $3/$2 * 100}')
+MEMORY_THRESHOLD=80
 
 DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+DISK_THRESHOLD=80
 
-echo "Disk Usage: $DISK_USAGE%"
 
+check_threshold "Memory"  "$MEMORY_USAGE" "$MEMORY_THRESHOLD"
 
-if [ $DISK_USAGE -gt 80 ]
-then
-    echo "WARNING: Disk usage above 80%"
-fi
+check_threshold "Disk" "$DISK_USAGE" "$DISK_THRESHOLD"
+
+check_threshold "CPU" "$CPU_USAGE" "$CPU_THRESHOLD"
 
 
 echo ""
