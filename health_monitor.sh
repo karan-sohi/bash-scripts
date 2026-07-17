@@ -3,18 +3,18 @@
 LOG_FILE="health_report.log"
 exec >> "$LOG_FILE" 2>&1
 
-if [ -f config.conf ] 
+if [ ! -f config.conf ] 
 then
     echo "ERROR: config.conf not found"
     exit 1
 fi
-source config.conf
+source "./config.conf"
 
 echo "=========================="
 echo " New Health Check Run"
 echo "=========================="
 echo "Run Time $(date +"%A, %B %d, %Y %I:%M:%S %p")"
-echo "Run Time: $(date +"%A, %B %d, %Y %I:%M:%S %p")"
+
 HOSTNAME=$(hostname)
 CURRENT_DATE=$(date)
 
@@ -22,6 +22,7 @@ echo "Hostname: $HOSTNAME"
 echo "Date: $CURRENT_DATE"
 
 WARNING_COUNT=0
+STATUS="HEALTHY"
 
 
 check_threshold() {
@@ -33,7 +34,7 @@ check_threshold() {
 
     if [ "$value" -ge "$threshold" ] 
     then
-    echo "WARNING: $metric usage above ${threshold}%"
+    echo "WARNING: $metric usage reached ${threshold}%"
     WARNING_COUNT=$((WARNING_COUNT+1))
     fi
 
@@ -58,8 +59,14 @@ check_threshold "CPU" "$CPU_USAGE" "$CPU_THRESHOLD"
 
 echo ""
 
-echo "Failed Services:"
-systemctl --failed
+
+FAILED_SERVICES=$(systemctl --failed --no-legend | wc -l)
+
+if [ "$FAILED_SERVICES" -gt 0 ]
+then
+    echo "WARNING: Failed services detected"
+    WARNING_COUNT=$((WARNING_COUNT+1))
+fi
 
 
 echo ""
@@ -69,16 +76,18 @@ then
     echo "Network: OK"
 else
     echo "Network: FAILED"
+    WARNING_COUNT=$((WARNING_COUNT+1))
 fi
 
 echo ""
 echo "Total Warnings: ${WARNING_COUNT}"
 
-
-
 if [ "$WARNING_COUNT" -gt 0 ]
 then
+    STATUS="WARNING"
+    echo "Overall Status: $STATUS"
     exit 1
 else
+    echo "Overall Status: $STATUS"
     exit 0
 fi
